@@ -20,9 +20,10 @@ use p2poolv2_lib::accounting::stats::metrics;
 use p2poolv2_lib::config::Config;
 use p2poolv2_lib::logging::setup_logging;
 use p2poolv2_lib::node::actor::NodeHandle;
-use p2poolv2_lib::shares::chain::chain_store::ChainStore;
+use p2poolv2_lib::shares::chain::chain_store_handle::ChainStoreHandle;
 use p2poolv2_lib::shares::share_block::ShareBlock;
 use p2poolv2_lib::store::Store;
+use p2poolv2_lib::store::writer::{StoreHandle, StoreWriter, write_channel};
 use p2poolv2_lib::stratum::client_connections::start_connections_handler;
 use p2poolv2_lib::stratum::emission::Emission;
 use p2poolv2_lib::stratum::server::StratumServerBuilder;
@@ -122,14 +123,26 @@ async fn main() -> Result<(), String> {
 
     let genesis = ShareBlock::build_genesis_for_network(config.stratum.network);
     let store = Arc::new(Store::new(config.store.path.clone(), false).unwrap());
-    let chain_store = Arc::new(ChainStore::new(
-        store.clone(),
-        genesis,
-        config.stratum.network,
-    ));
 
-    let tip = chain_store.store.get_chain_tip();
-    let height = chain_store.get_tip_height();
+    // Create StoreWriter for serialized database writes (runs on dedicated blocking thread)
+    let (write_tx, write_rx) = write_channel();
+    let store_writer = StoreWriter::new(store.clone(), write_rx);
+    tokio::task::spawn_blocking(move || store_writer.run());
+
+    // Create StoreHandle and ChainStoreHandle
+    let store_handle = StoreHandle::new(store.clone(), write_tx);
+    let chain_store_handle = ChainStoreHandle::new(store_handle, config.stratum.network);
+
+    if let Err(e) = chain_store_handle
+        .init_or_setup_genesis(genesis.clone())
+        .await
+    {
+        error!("Failed to initialize chain: {e}");
+        return Err(format!("Failed to initialize chain: {e}"));
+    }
+
+    let tip = chain_store_handle.store_handle().get_chain_tip();
+    let height = chain_store_handle.get_tip_height();
     info!("Latest tip {:?} at height {:?}", tip, height);
 
     let background_tasks_store = store.clone();
@@ -176,7 +189,11 @@ async fn main() -> Result<(), String> {
     let connections_cloned = connections_handle.clone();
 
     let tracker_handle_cloned = tracker_handle.clone();
-    let store_for_notify = chain_store.clone();
+    let chain_store_handle_for_notify = chain_store_handle.clone();
+    let miner_pubkey = config
+        .miner
+        .as_ref()
+        .map(|miner_config| miner_config.pubkey);
 
     let cloned_stratum_config = stratum_config.clone();
     tokio::spawn(async move {
@@ -185,10 +202,10 @@ async fn main() -> Result<(), String> {
         start_notify(
             notify_rx,
             connections_cloned,
-            store_for_notify,
+            chain_store_handle_for_notify,
             tracker_handle_cloned,
             &cloned_stratum_config,
-            None,
+            miner_pubkey,
         )
         .await;
     });
@@ -205,7 +222,7 @@ async fn main() -> Result<(), String> {
     let metrics_cloned = metrics_handle.clone();
     let metrics_for_shutdown = metrics_handle.clone();
     let stats_dir_for_shutdown = config.logging.stats_dir.clone();
-    let store_for_stratum = chain_store.clone();
+    let chain_store_handle_for_stratum = chain_store_handle.clone();
     let tracker_handle_cloned = tracker_handle.clone();
 
     tokio::spawn(async move {
@@ -224,7 +241,7 @@ async fn main() -> Result<(), String> {
             )) // 100% donation in bips, skip address validation
             .network(stratum_config.network)
             .version_mask(stratum_config.version_mask)
-            .store(store_for_stratum)
+            .chain_store_handle(chain_store_handle_for_stratum)
             .build()
             .await
             .unwrap();
@@ -246,7 +263,7 @@ async fn main() -> Result<(), String> {
 
     let api_shutdown_tx = match start_api_server(
         config.api.clone(),
-        chain_store.clone(),
+        chain_store_handle.clone(),
         metrics_handle.clone(),
         tracker_handle,
         stratum_config.network,
@@ -265,7 +282,7 @@ async fn main() -> Result<(), String> {
         config.api.hostname, config.api.port
     );
 
-    match NodeHandle::new(config, chain_store, emissions_rx, metrics_handle).await {
+    match NodeHandle::new(config, chain_store_handle, emissions_rx, metrics_handle).await {
         Ok((node_handle, stopping_rx)) => {
             info!("Node started");
 
