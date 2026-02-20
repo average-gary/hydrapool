@@ -31,8 +31,10 @@ use p2poolv2_lib::stratum::work::gbt::start_gbt;
 use p2poolv2_lib::stratum::work::notify::start_notify;
 use p2poolv2_lib::stratum::work::tracker::start_tracker_actor;
 use p2poolv2_lib::stratum::zmq_listener::{ZmqListener, ZmqListenerTrait};
+use p2poolv2_lib::stratum_sv2::channels::start_channel_manager;
 use p2poolv2_lib::stratum_sv2::connection::{AuthorityKeypair, Sv2ServerConfig, run_accept_loop};
 use p2poolv2_lib::stratum_sv2::connections::start_sv2_connections_handler;
+use p2poolv2_lib::stratum_sv2::handler::{Sv2ConnectionContext, handle_sv2_connection};
 use p2poolv2_lib::stratum_sv2::job_distributor::start_job_distributor;
 use std::process::exit;
 use std::sync::Arc;
@@ -255,14 +257,32 @@ async fn main() -> Result<(), String> {
                 authority,
             };
 
-            // Start SV2 connection registry actor
-            let _sv2_connections = start_sv2_connections_handler();
-
-            // Start SV2 job distributor actor
+            // Start SV2 actors
+            let sv2_connections = start_sv2_connections_handler().await;
             let sv2_job_dist = start_job_distributor(sv2_config.server_id);
 
+            // Default target: difficulty 1 (all 0xff except first 4 bytes)
+            let mut default_target = [0xff; 32];
+            default_target[0..4].copy_from_slice(&[0x00, 0x00, 0xff, 0xff]);
+            let sv2_channels = start_channel_manager(sv2_config.server_id, default_target);
+
+            // Determine validate_addresses from donation config
+            let sv2_validate_addresses =
+                stratum_config.donation.unwrap_or_default() != FULL_DONATION_BIPS;
+
+            // Build the shared context for per-connection handlers
+            let sv2_ctx = Sv2ConnectionContext {
+                connections: sv2_connections,
+                channels: sv2_channels,
+                job_distributor: sv2_job_dist,
+                emissions_tx: sv2_emissions_tx,
+                chain_store: chain_store_handle.clone(),
+                validate_addresses: sv2_validate_addresses,
+                network: stratum_config.network,
+            };
+
             // Start the TCP accept loop for SV2
-            let (handshake_tx, _handshake_rx) = tokio::sync::mpsc::channel(64);
+            let (handshake_tx, mut handshake_rx) = tokio::sync::mpsc::channel(64);
             tokio::spawn(async move {
                 if let Err(e) = run_accept_loop(sv2_server_config, handshake_tx, shutdown_rx).await
                 {
@@ -270,14 +290,21 @@ async fn main() -> Result<(), String> {
                 }
             });
 
+            // Spawn per-connection handlers as handshakes complete
+            let sv2_ctx_for_loop = sv2_ctx.clone();
+            tokio::spawn(async move {
+                while let Some(handshake) = handshake_rx.recv().await {
+                    let ctx = sv2_ctx_for_loop.clone();
+                    tokio::spawn(async move {
+                        handle_sv2_connection(handshake, ctx).await;
+                    });
+                }
+            });
+
             info!(
                 "SV2 server listening on {}:{} (Noise NX encrypted)",
                 sv2_config.hostname, sv2_config.port
             );
-
-            // Keep references alive for the per-connection message loop
-            // (will be wired in future work when handshake results are processed)
-            let _ = (sv2_emissions_tx, sv2_job_dist);
         }
     }
 
