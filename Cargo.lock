@@ -491,7 +491,7 @@ dependencies = [
 [[package]]
 name = "bitcoindrpc"
 version = "0.1.0"
-source = "git+https://github.com/average-gary/p2pool-v2?branch=sv2-support#a3410e2544a9b77588fda6b80f19281772f5a609"
+source = "git+https://github.com/average-gary/p2pool-v2?branch=sv2-support#96de8a9be98882009cf5037c6307dcfaf760e6c3"
 dependencies = [
  "base64 0.22.1",
  "bitcoin",
@@ -3170,7 +3170,7 @@ checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
 [[package]]
 name = "p2poolv2_api"
 version = "0.1.0"
-source = "git+https://github.com/average-gary/p2pool-v2?branch=sv2-support#a3410e2544a9b77588fda6b80f19281772f5a609"
+source = "git+https://github.com/average-gary/p2pool-v2?branch=sv2-support#96de8a9be98882009cf5037c6307dcfaf760e6c3"
 dependencies = [
  "axum",
  "base64 0.22.1",
@@ -3190,7 +3190,7 @@ dependencies = [
 [[package]]
 name = "p2poolv2_cli"
 version = "0.1.0"
-source = "git+https://github.com/average-gary/p2pool-v2?branch=sv2-support#a3410e2544a9b77588fda6b80f19281772f5a609"
+source = "git+https://github.com/average-gary/p2pool-v2?branch=sv2-support#96de8a9be98882009cf5037c6307dcfaf760e6c3"
 dependencies = [
  "base64 0.22.1",
  "clap",
@@ -3210,7 +3210,7 @@ dependencies = [
 [[package]]
 name = "p2poolv2_lib"
 version = "0.1.0"
-source = "git+https://github.com/average-gary/p2pool-v2?branch=sv2-support#a3410e2544a9b77588fda6b80f19281772f5a609"
+source = "git+https://github.com/average-gary/p2pool-v2?branch=sv2-support#96de8a9be98882009cf5037c6307dcfaf760e6c3"
 dependencies = [
  "async-trait",
  "base64 0.22.1",

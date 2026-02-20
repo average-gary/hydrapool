@@ -31,6 +31,9 @@ use p2poolv2_lib::stratum::work::gbt::start_gbt;
 use p2poolv2_lib::stratum::work::notify::start_notify;
 use p2poolv2_lib::stratum::work::tracker::start_tracker_actor;
 use p2poolv2_lib::stratum::zmq_listener::{ZmqListener, ZmqListenerTrait};
+use p2poolv2_lib::stratum_sv2::connection::{AuthorityKeypair, Sv2ServerConfig, run_accept_loop};
+use p2poolv2_lib::stratum_sv2::connections::start_sv2_connections_handler;
+use p2poolv2_lib::stratum_sv2::job_distributor::start_job_distributor;
 use std::process::exit;
 use std::sync::Arc;
 use std::time::Duration;
@@ -213,6 +216,71 @@ async fn main() -> Result<(), String> {
     let (emissions_tx, emissions_rx) =
         tokio::sync::mpsc::channel::<Emission>(STRATUM_SHARES_BUFFER_SIZE);
 
+    // --- SV2 Server Startup ---
+    // Clone emissions_tx before SV1 takes ownership, so SV2 shares feed
+    // into the same accounting pipeline.
+    let mut _sv2_shutdown_tx: Option<oneshot::Sender<()>> = None;
+    if let Some(ref sv2_config) = config.stratum_sv2 {
+        if sv2_config.enabled {
+            if let Err(e) = sv2_config.validate() {
+                error!("Invalid SV2 config: {e}");
+                return Err(format!("Invalid SV2 config: {e}"));
+            }
+
+            let sv2_emissions_tx = emissions_tx.clone();
+            let (shutdown_tx, shutdown_rx) = oneshot::channel();
+            _sv2_shutdown_tx = Some(shutdown_tx);
+
+            // Resolve authority keypair
+            let authority = match (
+                &sv2_config.authority_public_key,
+                &sv2_config.authority_secret_key,
+            ) {
+                (Some(pk), Some(sk)) => {
+                    AuthorityKeypair::from_config(pk, sk, sv2_config.cert_validity_seconds)
+                        .map_err(|e| format!("SV2 keypair error: {e}"))?
+                }
+                _ => {
+                    error!("SV2 enabled but authority_public_key/authority_secret_key not set");
+                    return Err(
+                        "SV2 requires authority_public_key and authority_secret_key in config"
+                            .to_string(),
+                    );
+                }
+            };
+
+            let sv2_server_config = Sv2ServerConfig {
+                hostname: sv2_config.hostname.clone(),
+                port: sv2_config.port,
+                authority,
+            };
+
+            // Start SV2 connection registry actor
+            let _sv2_connections = start_sv2_connections_handler();
+
+            // Start SV2 job distributor actor
+            let sv2_job_dist = start_job_distributor(sv2_config.server_id);
+
+            // Start the TCP accept loop for SV2
+            let (handshake_tx, _handshake_rx) = tokio::sync::mpsc::channel(64);
+            tokio::spawn(async move {
+                if let Err(e) = run_accept_loop(sv2_server_config, handshake_tx, shutdown_rx).await
+                {
+                    error!("SV2 accept loop error: {e}");
+                }
+            });
+
+            info!(
+                "SV2 server listening on {}:{} (Noise NX encrypted)",
+                sv2_config.hostname, sv2_config.port
+            );
+
+            // Keep references alive for the per-connection message loop
+            // (will be wired in future work when handshake results are processed)
+            let _ = (sv2_emissions_tx, sv2_job_dist);
+        }
+    }
+
     let metrics_handle = match metrics::start_metrics(config.logging.stats_dir.clone()).await {
         Ok(handle) => handle,
         Err(e) => {
@@ -309,6 +377,11 @@ async fn main() -> Result<(), String> {
             stratum_shutdown_tx
                 .send(())
                 .expect("Failed to send shutdown signal to Stratum server");
+
+            if let Some(sv2_tx) = _sv2_shutdown_tx.take() {
+                let _ = sv2_tx.send(());
+                info!("SV2 server stopped");
+            }
 
             api_shutdown_tx
                 .send(())
