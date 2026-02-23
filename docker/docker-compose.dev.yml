@@ -8,7 +8,7 @@ services:
       dockerfile: docker/Dockerfile.hydrapool
     image: hydrapool:dev
     networks:
-      - p2pool_network
+      - hydrapool_network
 
   hydrapool-cli:
     build:
@@ -16,7 +16,7 @@ services:
       dockerfile: docker/Dockerfile.hydrapool
     image: hydrapool:dev
     networks:
-      - p2pool_network
+      - hydrapool_network
 
   prometheus:
     build:
@@ -26,7 +26,7 @@ services:
     ports:
       - "9090:9090"
     networks:
-      - p2pool_network
+      - hydrapool_network
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
@@ -39,10 +39,10 @@ services:
     ports:
       - "3000:3000"
     networks:
-      - p2pool_network
+      - hydrapool_network
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
 networks:
-  p2pool_network:
+  hydrapool_network:
     driver: bridge

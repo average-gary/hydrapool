@@ -46,10 +46,15 @@ docker compose ps
 
 ### 5. Access services
 
-- **Stratum mining:** `stratum+tcp://localhost:3333`
+- **Stratum V1 mining:** `stratum+tcp://localhost:3333`
+- **Stratum V2 mining:** `noise+tcp://localhost:3334` (encrypted, requires SV2-compatible miner; enable in config first)
 - **API server:** `http://localhost:46884`
 - **Grafana dashboard:** `http://localhost:3000` (if running with dashboards, login with credentials from step 2)
 - **Prometheus:** `http://localhost:9090` (if running with dashboards)
+
+> **Note:** Stratum V2 is disabled by default. Uncomment and configure the
+> `[stratum_sv2]` section in `config.toml` to enable it. A Noise NX keypair
+> (`authority_public_key` / `authority_secret_key`) is required.
 
 ## Updating Configuration
 

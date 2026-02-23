@@ -40,10 +40,13 @@ pool_signature = "hydrapool"
 # enabled = true
 # hostname = "0.0.0.0"
 # port = 3334
-# Noise NX keypair for encrypted connections. If omitted, a fresh
-# keypair is generated on each startup (fine for development).
-# authority_public_key = "<base58check-encoded x-only pubkey>"
-# authority_secret_key = "<64 hex chars (32 bytes)>"
+# Noise NX keypair for encrypted connections. REQUIRED when SV2 is
+# enabled — the server will refuse to start without both keys.
+# Generate a keypair with:
+#   openssl rand -hex 32   # -> authority_secret_key
+# Then derive the x-only public key from the secret key using secp256k1.
+# authority_public_key = "<64 hex chars (32-byte x-only pubkey)>"
+# authority_secret_key = "<64 hex chars (32-byte secret key)>"
 # cert_validity_seconds = 86400
 # default_extranonce_size = 16
 # server_id = 0

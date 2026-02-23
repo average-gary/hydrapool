@@ -200,20 +200,15 @@ async fn main() -> Result<(), String> {
         .as_ref()
         .map(|miner_config| miner_config.pubkey);
 
-    let cloned_stratum_config = stratum_config.clone();
-    tokio::spawn(async move {
-        info!("Starting Stratum notifier...");
-        // This will run indefinitely, sending new block templates to the Stratum server as they arrive
-        start_notify(
-            notify_rx,
-            connections_cloned,
-            chain_store_handle_for_notify,
-            tracker_handle_cloned,
-            &cloned_stratum_config,
-            miner_pubkey,
-        )
-        .await;
-    });
+    // SV2 job distributor handle will be passed to start_notify() so that new
+    // templates are forwarded to SV2 miners via the same GBT pipeline.
+    // We set this to Some(...) below if SV2 is enabled, otherwise it stays None.
+    let mut sv2_job_distributor_for_notify: Option<
+        p2poolv2_lib::stratum_sv2::job_distributor::Sv2JobDistributorHandle,
+    > = None;
+    // Placeholder — will be set in the SV2 startup block below, used
+    // when spawning the notify task after the SV2 section.
+    let _ = &sv2_job_distributor_for_notify;
 
     let (emissions_tx, emissions_rx) =
         tokio::sync::mpsc::channel::<Emission>(STRATUM_SHARES_BUFFER_SIZE);
@@ -270,6 +265,10 @@ async fn main() -> Result<(), String> {
             let sv2_validate_addresses =
                 stratum_config.donation.unwrap_or_default() != FULL_DONATION_BIPS;
 
+            // Wire the SV2 job distributor into the notify pipeline so
+            // new block templates are forwarded to SV2 miners.
+            sv2_job_distributor_for_notify = Some(sv2_job_dist.clone());
+
             // Build the shared context for per-connection handlers
             let sv2_ctx = Sv2ConnectionContext {
                 connections: sv2_connections,
@@ -307,6 +306,23 @@ async fn main() -> Result<(), String> {
             );
         }
     }
+
+    // Start the notify task AFTER the SV2 block so sv2_job_distributor_for_notify
+    // is set when SV2 is enabled.
+    let cloned_stratum_config = stratum_config.clone();
+    tokio::spawn(async move {
+        info!("Starting Stratum notifier...");
+        start_notify(
+            notify_rx,
+            connections_cloned,
+            chain_store_handle_for_notify,
+            tracker_handle_cloned,
+            &cloned_stratum_config,
+            miner_pubkey,
+            sv2_job_distributor_for_notify,
+        )
+        .await;
+    });
 
     let metrics_handle = match metrics::start_metrics(config.logging.stats_dir.clone()).await {
         Ok(handle) => handle,
