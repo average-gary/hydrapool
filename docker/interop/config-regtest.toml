@@ -1,0 +1,52 @@
+# Hydrapool configuration for SV2 interoperability testing (regtest).
+#
+# This config is used by the docker-compose.interop.yml setup.
+# The authority keypair must be generated before starting the test
+# (see scripts/test-interop-sv2.sh).
+
+[store]
+path = "/var/lib/hydrapool/store.db"
+background_task_frequency_hours = 24
+pplns_ttl_days = 1
+
+[stratum]
+hostname = "0.0.0.0"
+port = 3333
+start_difficulty = 1
+minimum_difficulty = 1
+bootstrap_address = "bcrt1qw508d6qejxtdg4y5r3zarvary0c5xw7k0fvkez"
+donation_address = "bcrt1qw508d6qejxtdg4y5r3zarvary0c5xw7k0fvkez"
+donation = 10000
+ignore_difficulty = true
+zmqpubhashblock = "tcp://bitcoind:28332"
+network = "regtest"
+version_mask = "1fffe000"
+difficulty_multiplier = 1.0
+pool_signature = "hydrapool-interop"
+
+[stratum_sv2]
+enabled = true
+hostname = "0.0.0.0"
+port = 3334
+# These keys are injected by the test script via sed before starting.
+# Generate with: scripts/test-interop-sv2.sh (which calls keygen)
+authority_public_key = "AUTHORITY_PUBLIC_KEY_PLACEHOLDER"
+authority_secret_key = "AUTHORITY_SECRET_KEY_PLACEHOLDER"
+cert_validity_seconds = 86400
+default_extranonce_size = 16
+server_id = 0
+
+[bitcoinrpc]
+url = "http://bitcoind:18443"
+username = "hydrapool"
+password = "hydrapool"
+
+[logging]
+level = "debug"
+stats_dir = "/var/log/hydrapool/stats"
+
+[api]
+hostname = "0.0.0.0"
+port = 46884
+auth_user = "hydrapool"
+auth_token = "0d74058f74ad3b6768493cedb5e9492b$2a2599d5f4003c291e141762d0e43808cfd932f04a8260e94c375d1574599dbf"
