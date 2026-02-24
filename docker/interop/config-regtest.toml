@@ -1,4 +1,7 @@
-# Hydrapool configuration for SV2 interoperability testing (regtest).
+# Hydrapool configuration for SV2 interoperability testing.
+#
+# Bitcoind runs in regtest for fast block generation, but Hydrapool
+# uses signet for the share chain (p2poolv2_lib doesn't support regtest).
 #
 # This config is used by the docker-compose.interop.yml setup.
 # The authority keypair must be generated before starting the test
@@ -14,15 +17,15 @@ hostname = "0.0.0.0"
 port = 3333
 start_difficulty = 1
 minimum_difficulty = 1
-bootstrap_address = "bcrt1qw508d6qejxtdg4y5r3zarvary0c5xw7k0fvkez"
-donation_address = "bcrt1qw508d6qejxtdg4y5r3zarvary0c5xw7k0fvkez"
+bootstrap_address = "tb1qyazxde6558qj6z3d9np5e6msmrspwpf6k0qggk"
+donation_address = "tb1qyazxde6558qj6z3d9np5e6msmrspwpf6k0qggk"
 donation = 10000
 ignore_difficulty = true
 zmqpubhashblock = "tcp://bitcoind:28332"
-network = "regtest"
+network = "signet"
 version_mask = "1fffe000"
 difficulty_multiplier = 1.0
-pool_signature = "hydrapool-interop"
+pool_signature = "hydrapool-sv2"
 
 [stratum_sv2]
 enabled = true
@@ -48,5 +51,4 @@ stats_dir = "/var/log/hydrapool/stats"
 [api]
 hostname = "0.0.0.0"
 port = 46884
-auth_user = "hydrapool"
-auth_token = "0d74058f74ad3b6768493cedb5e9492b$2a2599d5f4003c291e141762d0e43808cfd932f04a8260e94c375d1574599dbf"
+# No auth for interop testing (auth_user and auth_token omitted)

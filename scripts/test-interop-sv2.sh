@@ -65,55 +65,15 @@ info() {
 }
 
 # -----------------------------------------------------------------------
-# Step 0: Generate authority keypair for Noise NX
+# Step 0: Authority keypair for Noise NX
 # -----------------------------------------------------------------------
-info "Generating Noise NX authority keypair..."
+info "Using pre-computed Noise NX authority keypair..."
 
-# Generate a random 32-byte secret key
-SECRET_KEY_HEX=$(openssl rand -hex 32)
-
-# We need to derive the x-only public key from the secret key.
-# Since we don't have secp256k1 CLI tools readily available, we use
-# openssl with the secp256k1 curve to derive the public key.
-#
-# However, the simplest approach for a test is to use a known keypair.
-# The Hydrapool SV2 server uses the secret key to create a Noise NX
-# responder, and the mining-device connects without pubkey validation
-# (when --pubkey-pool is not passed).
-#
-# For interop testing without cert validation, we only need a valid
-# secret key. The public key in config is validated at startup.
-#
-# Use a pre-computed test keypair (same as the integration tests):
-SECRET_KEY_HEX="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-
-# The corresponding x-only public key (with even parity enforced):
-# This was computed by test_authority_keypair() in the integration tests.
-# We need to derive it properly. For now, we'll generate it using python
-# if available, otherwise use a hardcoded value.
-if command -v python3 &>/dev/null; then
-    PUBLIC_KEY_HEX=$(python3 -c "
-import hashlib
-try:
-    # Try using the coincurve library (pip install coincurve)
-    from coincurve import PrivateKey
-    sk_bytes = bytes.fromhex('$SECRET_KEY_HEX')
-    pk = PrivateKey(sk_bytes)
-    # Get x-only (32 bytes) from the 33-byte compressed public key
-    compressed = pk.public_key.format(compressed=True)
-    # x-only is bytes 1..33 of the compressed key
-    xonly = compressed[1:33]
-    print(xonly.hex())
-except ImportError:
-    # Fallback: use a pre-computed value for the test secret key
-    # e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-    # -> x-only pubkey (even parity):
-    print('3370edadac62d83fab3287516e6ab6f0dfbc7eef4ebb52b10ed1cc3b99781ad4')
-" 2>/dev/null) || PUBLIC_KEY_HEX="3370edadac62d83fab3287516e6ab6f0dfbc7eef4ebb52b10ed1cc3b99781ad4"
-else
-    # Hardcoded for the test secret key
-    PUBLIC_KEY_HEX="3370edadac62d83fab3287516e6ab6f0dfbc7eef4ebb52b10ed1cc3b99781ad4"
-fi
+# Pre-computed secp256k1 keypair with even-parity x-only public key.
+# Derived from SHA-256("") with parity negation applied.
+# Verified against Responder::from_authority_kp() in the SRI noise-sv2 crate.
+SECRET_KEY_HEX="1c4f3bbd6703e3eb65040b37669046da93009b024aad0cef1b3cc57157e388ec"
+PUBLIC_KEY_HEX="a34b99f22c790c4e36b2b3c2c35a36db06226e41c692fc82b8b56ac1c540c5bd"
 
 info "Authority secret key: ${SECRET_KEY_HEX:0:8}..."
 info "Authority public key: ${PUBLIC_KEY_HEX:0:8}..."
@@ -205,8 +165,7 @@ docker compose -f "$COMPOSE_FILE" up -d hydrapool
 info "Waiting for Hydrapool to be ready..."
 for i in $(seq 1 120); do
     if docker compose -f "$COMPOSE_FILE" exec -T hydrapool \
-        wget -q --spider --header='Authorization: Basic aHlkcmFwb29sOg==' \
-        http://127.0.0.1:46884/health 2>/dev/null; then
+        wget -q --spider http://127.0.0.1:46884/health 2>/dev/null; then
         break
     fi
     if [[ $i -eq 120 ]]; then

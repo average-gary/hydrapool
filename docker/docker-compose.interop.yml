@@ -52,7 +52,7 @@ services:
     environment:
       - RUST_LOG=debug
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "--header=Authorization: Basic aHlkcmFwb29sOg==", "http://127.0.0.1:46884/health"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:46884/health"]
       interval: 5s
       timeout: 5s
       retries: 30
@@ -70,7 +70,7 @@ services:
       - --address-pool
       - hydrapool:3334
       - --id-user
-      - "bcrt1qw508d6qejxtdg4y5r3zarvary0c5xw7k0fvkez.interop-rig1"
+      - "tb1qyazxde6558qj6z3d9np5e6msmrspwpf6k0qggk.interop-rig1"
       - --nominal-hashrate-multiplier
       - "0.01"
     networks:
