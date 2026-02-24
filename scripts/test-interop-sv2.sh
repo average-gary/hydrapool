@@ -200,42 +200,33 @@ docker compose -f "$COMPOSE_FILE" up -d mining-device
 # -----------------------------------------------------------------------
 info "Waiting for mining-device to submit shares (up to 120s)..."
 
+# Helper: check pool logs for a pattern (pipes directly, avoids capturing 50MB+)
+# Uses grep -m1 to stop after first match, and disables pipefail locally to
+# avoid SIGPIPE errors when grep exits before docker compose finishes writing.
+pool_log_has() {
+    set +o pipefail
+    docker compose -f "$COMPOSE_FILE" logs hydrapool 2>/dev/null | grep -q -m1 "$1"
+    local rc=$?
+    set -o pipefail
+    return $rc
+}
+
 SHARES_FOUND=false
 for i in $(seq 1 120); do
-    # Check mining-device logs for share submission indicators
-    DEVICE_LOGS=$(docker compose -f "$COMPOSE_FILE" logs mining-device 2>/dev/null)
-
-    # The SRI mining-device logs "Share submitted" or similar on successful submission
-    if echo "$DEVICE_LOGS" | grep -qi "share\|submit\|accepted\|success\|mining_job\|new.mining.job\|channel.*open"; then
-        # Check for specific lifecycle events
-        HAS_CHANNEL=false
-        HAS_JOB=false
-        HAS_SHARE=false
-
-        if echo "$DEVICE_LOGS" | grep -qi "channel.*open\|open.*channel\|channel_id"; then
-            HAS_CHANNEL=true
-        fi
-        if echo "$DEVICE_LOGS" | grep -qi "new.*mining.*job\|mining_job\|job_id\|SetNewPrevHash\|prev_hash"; then
-            HAS_JOB=true
-        fi
-        if echo "$DEVICE_LOGS" | grep -qi "share.*submit\|submit.*share\|accepted\|success"; then
-            HAS_SHARE=true
-        fi
-
-        if [[ "$HAS_CHANNEL" == true ]] && [[ "$HAS_JOB" == true ]]; then
-            SHARES_FOUND=true
-            break
-        fi
+    # Check Hydrapool logs for SV2 share validation (most reliable signal)
+    if pool_log_has "validated SV2 share"; then
+        SHARES_FOUND=true
+        break
     fi
 
-    # Also check Hydrapool logs for SV2 connection activity
-    POOL_LOGS=$(docker compose -f "$COMPOSE_FILE" logs hydrapool 2>/dev/null)
-    if echo "$POOL_LOGS" | grep -qi "SV2.*channel.*opened\|SV2.*share\|sv2.*connection.*handler"; then
-        if echo "$POOL_LOGS" | grep -qi "SV2.*standard.*mining.*channel.*opened\|channel.*opened"; then
-            # At minimum the channel was opened, which proves the full handshake worked
+    # Check if mining-device exited (it may crash after submitting shares)
+    if ! docker compose -f "$COMPOSE_FILE" ps mining-device --status running 2>/dev/null | grep -q mining-device; then
+        # Container is not running — give pool a moment to flush logs, then check
+        sleep 2
+        if pool_log_has "validated SV2 share" || pool_log_has "SV2 standard mining channel opened"; then
             SHARES_FOUND=true
-            break
         fi
+        break
     fi
 
     if [[ $i -eq 120 ]]; then
@@ -257,55 +248,54 @@ echo " SV2 Interoperability Test Results"
 echo "========================================"
 echo ""
 
-# Collect evidence from logs
-POOL_LOGS=$(docker compose -f "$COMPOSE_FILE" logs hydrapool 2>/dev/null)
-DEVICE_LOGS=$(docker compose -f "$COMPOSE_FILE" logs mining-device 2>/dev/null)
-
-# Check each phase
+# Check each phase (pipe directly into grep to avoid capturing huge logs)
 PHASE_RESULTS=()
 
 # Phase 1: Noise handshake
-if echo "$POOL_LOGS" | grep -qi "starting SV2 connection handler\|SV2.*connection"; then
-    pass "Noise NX handshake completed"
+if pool_log_has "SV2 Noise handshake completed"; then
+    pass "Phase 1: Noise NX handshake completed"
     PHASE_RESULTS+=(1)
 else
-    echo -e "${RED}UNKNOWN: Noise NX handshake status unclear${NC}"
+    echo -e "${RED}FAIL: Phase 1: Noise NX handshake not detected${NC}"
 fi
 
 # Phase 2: SetupConnection
-if echo "$POOL_LOGS" | grep -qi "SetupConnection succeeded\|setup.*connection.*success"; then
-    pass "SetupConnection exchange succeeded"
+if pool_log_has "SetupConnection succeeded"; then
+    pass "Phase 2: SetupConnection exchange succeeded"
     PHASE_RESULTS+=(1)
 else
-    echo -e "${RED}UNKNOWN: SetupConnection status unclear${NC}"
+    echo -e "${RED}FAIL: Phase 2: SetupConnection not detected${NC}"
 fi
 
 # Phase 3: OpenStandardMiningChannel
-if echo "$POOL_LOGS" | grep -qi "standard mining channel opened\|channel.*opened"; then
-    pass "OpenStandardMiningChannel succeeded"
+if pool_log_has "SV2 standard mining channel opened"; then
+    pass "Phase 3: OpenStandardMiningChannel succeeded"
     PHASE_RESULTS+=(1)
 else
-    echo -e "${RED}UNKNOWN: Channel open status unclear${NC}"
+    echo -e "${RED}FAIL: Phase 3: Channel open not detected${NC}"
 fi
 
 # Phase 4: Job distribution
-if echo "$DEVICE_LOGS" | grep -qi "job\|mining\|prev_hash" || \
-   echo "$POOL_LOGS" | grep -qi "new block detected\|distributing.*job\|built SV2"; then
-    pass "Job distribution working (NewMiningJob + SetNewPrevHash)"
+if pool_log_has "built SV2 NewMiningJob"; then
+    pass "Phase 4: Job distribution working (NewMiningJob + SetNewPrevHash)"
     PHASE_RESULTS+=(1)
 else
-    echo -e "${RED}UNKNOWN: Job distribution status unclear${NC}"
+    echo -e "${RED}FAIL: Phase 4: Job distribution not detected${NC}"
 fi
 
 # Phase 5: Share submission
-if echo "$POOL_LOGS" | grep -qi "validated SV2 share\|emitted SV2 share\|low-difficulty-share\|SV2.*share"; then
-    pass "Share submission pipeline active"
+if pool_log_has "validated SV2 share"; then
+    pass "Phase 5: Share submission and validation working"
     PHASE_RESULTS+=(1)
-elif echo "$DEVICE_LOGS" | grep -qi "share\|submit"; then
-    pass "Mining-device attempting share submissions"
-    PHASE_RESULTS+=(1)
+    # Count shares for extra info (disable pipefail for pipe safety)
+    set +o pipefail
+    SHARE_COUNT=$(docker compose -f "$COMPOSE_FILE" logs hydrapool 2>/dev/null | grep -c "validated SV2 share" || true)
+    EMITTED_COUNT=$(docker compose -f "$COMPOSE_FILE" logs hydrapool 2>/dev/null | grep -c "emitted SV2 share" || true)
+    NETWORK_COUNT=$(docker compose -f "$COMPOSE_FILE" logs hydrapool 2>/dev/null | grep -c "share meets Bitcoin network difficulty" || true)
+    set -o pipefail
+    info "  Shares validated: $SHARE_COUNT, emitted to pipeline: $EMITTED_COUNT, met network difficulty: $NETWORK_COUNT"
 else
-    echo -e "${YELLOW}NOTE: No share submissions detected yet (may need more time)${NC}"
+    echo -e "${YELLOW}NOTE: Phase 5: No share submissions detected (may need more time)${NC}"
 fi
 
 echo ""
