@@ -395,7 +395,7 @@ checksum = "d965446196e3b7decd44aa7ee49e31d630118f90ef12f97900f262eb915c951d"
 [[package]]
 name = "binary_sv2"
 version = "5.0.1"
-source = "git+https://github.com/average-gary/stratum?branch=feature-flag-subprotocols#f62dd1dc9ab2912c4fa9932a9a47affb97b4933f"
+source = "git+https://github.com/average-gary/stratum?branch=feature-flag-subprotocols#4d35e317ab3388fa92024615a51f9415581717c9"
 dependencies = [
  "derive_codec_sv2",
 ]
@@ -491,7 +491,7 @@ dependencies = [
 [[package]]
 name = "bitcoindrpc"
 version = "0.1.0"
-source = "git+https://github.com/average-gary/p2pool-v2?branch=sv2-support#bcc6f5e83b9909fdd43e4970024b108835f86188"
+source = "git+https://github.com/average-gary/p2pool-v2?branch=sv2-support#9736403abec9ccb6cee3e6fca3a8d49b6c1d8b61"
 dependencies = [
  "base64 0.22.1",
  "bitcoin",
@@ -534,7 +534,16 @@ version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "46502ad458c9a52b69d4d4d32775c788b7a1b85e8bc9d482d92250fc0e3f8efe"
 dependencies = [
- "digest",
+ "digest 0.10.7",
+]
+
+[[package]]
+name = "block-buffer"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4152116fd6e9dadb291ae18fc1ec3575ed6d84c29642d97890f4b4a3417297e4"
+dependencies = [
+ "generic-array",
 ]
 
 [[package]]
@@ -571,6 +580,15 @@ dependencies = [
 
 [[package]]
 name = "bs58"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "771fe0050b883fcc3ea2359b1a96bcfbc090b7116eae7c3c512c7a083fdf23d3"
+dependencies = [
+ "sha2 0.9.9",
+]
+
+[[package]]
+name = "bs58"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bf88ba1141d185c399bee5288d850d63b8369520c1eafc32a0430b5b6c287bf4"
@@ -581,7 +599,7 @@ dependencies = [
 [[package]]
 name = "buffer_sv2"
 version = "3.0.1"
-source = "git+https://github.com/average-gary/stratum?branch=feature-flag-subprotocols#f62dd1dc9ab2912c4fa9932a9a47affb97b4933f"
+source = "git+https://github.com/average-gary/stratum?branch=feature-flag-subprotocols#4d35e317ab3388fa92024615a51f9415581717c9"
 dependencies = [
  "aes-gcm",
 ]
@@ -711,7 +729,7 @@ dependencies = [
 [[package]]
 name = "channels_sv2"
 version = "4.0.0"
-source = "git+https://github.com/average-gary/stratum?branch=feature-flag-subprotocols#f62dd1dc9ab2912c4fa9932a9a47affb97b4933f"
+source = "git+https://github.com/average-gary/stratum?branch=feature-flag-subprotocols#4d35e317ab3388fa92024615a51f9415581717c9"
 dependencies = [
  "binary_sv2",
  "bitcoin",
@@ -800,7 +818,7 @@ checksum = "b94f61472cee1439c0b966b47e3aca9ae07e45d070759512cd390ea2bebc6675"
 [[package]]
 name = "codec_sv2"
 version = "5.0.0"
-source = "git+https://github.com/average-gary/stratum?branch=feature-flag-subprotocols#f62dd1dc9ab2912c4fa9932a9a47affb97b4933f"
+source = "git+https://github.com/average-gary/stratum?branch=feature-flag-subprotocols#4d35e317ab3388fa92024615a51f9415581717c9"
 dependencies = [
  "binary_sv2",
  "buffer_sv2",
@@ -819,7 +837,7 @@ checksum = "b05b61dc5112cbb17e4b6cd61790d9845d13888356391624cbe7e41efeac1e75"
 [[package]]
 name = "common_messages_sv2"
 version = "7.0.0"
-source = "git+https://github.com/average-gary/stratum?branch=feature-flag-subprotocols#f62dd1dc9ab2912c4fa9932a9a47affb97b4933f"
+source = "git+https://github.com/average-gary/stratum?branch=feature-flag-subprotocols#4d35e317ab3388fa92024615a51f9415581717c9"
 dependencies = [
  "binary_sv2",
 ]
@@ -1015,7 +1033,7 @@ dependencies = [
  "cfg-if",
  "cpufeatures",
  "curve25519-dalek-derive",
- "digest",
+ "digest 0.10.7",
  "fiat-crypto",
  "rustc_version",
  "subtle",
@@ -1109,7 +1127,16 @@ dependencies = [
 [[package]]
 name = "derive_codec_sv2"
 version = "1.1.2"
-source = "git+https://github.com/average-gary/stratum?branch=feature-flag-subprotocols#f62dd1dc9ab2912c4fa9932a9a47affb97b4933f"
+source = "git+https://github.com/average-gary/stratum?branch=feature-flag-subprotocols#4d35e317ab3388fa92024615a51f9415581717c9"
+
+[[package]]
+name = "digest"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3dd60d1080a57a05ab032377049e0591415d2b31afd7028356dbf3cc6dcb066"
+dependencies = [
+ "generic-array",
+]
 
 [[package]]
 name = "digest"
@@ -1117,7 +1144,7 @@ version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
 dependencies = [
- "block-buffer",
+ "block-buffer 0.10.4",
  "const-oid",
  "crypto-common",
  "subtle",
@@ -1164,7 +1191,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ee27f32b5c5292967d2d4a9d7f1e0b0aed2c15daded5a60300e4abb9d8020bca"
 dependencies = [
  "der",
- "digest",
+ "digest 0.10.7",
  "elliptic-curve",
  "rfc6979",
  "signature",
@@ -1190,7 +1217,7 @@ dependencies = [
  "curve25519-dalek",
  "ed25519",
  "serde",
- "sha2",
+ "sha2 0.10.9",
  "subtle",
  "zeroize",
 ]
@@ -1209,7 +1236,7 @@ checksum = "b5e6043086bf7973472e0c7dff2142ea0b680d30e18d9cc40f267efbf222bd47"
 dependencies = [
  "base16ct",
  "crypto-bigint",
- "digest",
+ "digest 0.10.7",
  "ff",
  "generic-array",
  "group",
@@ -1281,7 +1308,7 @@ dependencies = [
 [[package]]
 name = "extensions_sv2"
 version = "0.1.0"
-source = "git+https://github.com/average-gary/stratum?branch=feature-flag-subprotocols#f62dd1dc9ab2912c4fa9932a9a47affb97b4933f"
+source = "git+https://github.com/average-gary/stratum?branch=feature-flag-subprotocols#4d35e317ab3388fa92024615a51f9415581717c9"
 dependencies = [
  "binary_sv2",
 ]
@@ -1359,7 +1386,7 @@ dependencies = [
 [[package]]
 name = "framing_sv2"
 version = "6.0.1"
-source = "git+https://github.com/average-gary/stratum?branch=feature-flag-subprotocols#f62dd1dc9ab2912c4fa9932a9a47affb97b4933f"
+source = "git+https://github.com/average-gary/stratum?branch=feature-flag-subprotocols#4d35e317ab3388fa92024615a51f9415581717c9"
 dependencies = [
  "binary_sv2",
  "noise_sv2",
@@ -1610,7 +1637,7 @@ dependencies = [
 [[package]]
 name = "handlers_sv2"
 version = "0.2.2"
-source = "git+https://github.com/average-gary/stratum?branch=feature-flag-subprotocols#f62dd1dc9ab2912c4fa9932a9a47affb97b4933f"
+source = "git+https://github.com/average-gary/stratum?branch=feature-flag-subprotocols#4d35e317ab3388fa92024615a51f9415581717c9"
 dependencies = [
  "binary_sv2",
  "common_messages_sv2",
@@ -1747,7 +1774,7 @@ version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c49c37c09c17a53d937dfbb742eb3a961d65a994e6bcdcf37e7399d0cc8ab5e"
 dependencies = [
- "digest",
+ "digest 0.10.7",
 ]
 
 [[package]]
@@ -2278,8 +2305,21 @@ dependencies = [
  "ecdsa",
  "elliptic-curve",
  "once_cell",
- "sha2",
+ "sha2 0.10.9",
  "signature",
+]
+
+[[package]]
+name = "key-utils"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ffe8551792fd4461e519fdfd8b8f334d1bf480250786fd202baf418854ff7130"
+dependencies = [
+ "bs58 0.4.0",
+ "rand 0.8.5",
+ "rustversion",
+ "secp256k1 0.28.2",
+ "serde",
 ]
 
 [[package]]
@@ -2436,14 +2476,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3104e13b51e4711ff5738caa1fb54467c8604c2e94d607e27745bcf709068774"
 dependencies = [
  "asn1_der",
- "bs58",
+ "bs58 0.5.1",
  "ed25519-dalek",
  "hkdf",
  "k256",
  "multihash",
  "quick-protobuf",
  "rand 0.8.5",
- "sha2",
+ "sha2 0.10.9",
  "thiserror 2.0.12",
  "tracing",
  "zeroize",
@@ -2470,7 +2510,7 @@ dependencies = [
  "quick-protobuf",
  "quick-protobuf-codec",
  "rand 0.8.5",
- "sha2",
+ "sha2 0.10.9",
  "smallvec",
  "thiserror 1.0.69",
  "tracing",
@@ -2533,7 +2573,7 @@ dependencies = [
  "once_cell",
  "quick-protobuf",
  "rand 0.8.5",
- "sha2",
+ "sha2 0.10.9",
  "snow",
  "static_assertions",
  "thiserror 1.0.69",
@@ -2819,7 +2859,7 @@ checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
 [[package]]
 name = "mining_sv2"
 version = "7.0.0"
-source = "git+https://github.com/average-gary/stratum?branch=feature-flag-subprotocols#f62dd1dc9ab2912c4fa9932a9a47affb97b4933f"
+source = "git+https://github.com/average-gary/stratum?branch=feature-flag-subprotocols#4d35e317ab3388fa92024615a51f9415581717c9"
 dependencies = [
  "binary_sv2",
 ]
@@ -2999,7 +3039,7 @@ checksum = "2bf50223579dc7cdcfb3bfcacf7069ff68243f8c363f62ffa99cf000a6b9c451"
 [[package]]
 name = "noise_sv2"
 version = "1.4.2"
-source = "git+https://github.com/average-gary/stratum?branch=feature-flag-subprotocols#f62dd1dc9ab2912c4fa9932a9a47affb97b4933f"
+source = "git+https://github.com/average-gary/stratum?branch=feature-flag-subprotocols#4d35e317ab3388fa92024615a51f9415581717c9"
 dependencies = [
  "aes-gcm",
  "chacha20poly1305",
@@ -3170,7 +3210,7 @@ checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
 [[package]]
 name = "p2poolv2_api"
 version = "0.1.0"
-source = "git+https://github.com/average-gary/p2pool-v2?branch=sv2-support#bcc6f5e83b9909fdd43e4970024b108835f86188"
+source = "git+https://github.com/average-gary/p2pool-v2?branch=sv2-support#9736403abec9ccb6cee3e6fca3a8d49b6c1d8b61"
 dependencies = [
  "axum",
  "base64 0.22.1",
@@ -3181,7 +3221,7 @@ dependencies = [
  "p2poolv2_lib",
  "serde",
  "serde_json",
- "sha2",
+ "sha2 0.10.9",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -3190,7 +3230,7 @@ dependencies = [
 [[package]]
 name = "p2poolv2_cli"
 version = "0.1.0"
-source = "git+https://github.com/average-gary/p2pool-v2?branch=sv2-support#bcc6f5e83b9909fdd43e4970024b108835f86188"
+source = "git+https://github.com/average-gary/p2pool-v2?branch=sv2-support#9736403abec9ccb6cee3e6fca3a8d49b6c1d8b61"
 dependencies = [
  "base64 0.22.1",
  "clap",
@@ -3201,7 +3241,7 @@ dependencies = [
  "rand 0.8.5",
  "rpassword",
  "serde",
- "sha2",
+ "sha2 0.10.9",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -3210,7 +3250,7 @@ dependencies = [
 [[package]]
 name = "p2poolv2_lib"
 version = "0.1.0"
-source = "git+https://github.com/average-gary/p2pool-v2?branch=sv2-support#bcc6f5e83b9909fdd43e4970024b108835f86188"
+source = "git+https://github.com/average-gary/p2pool-v2?branch=sv2-support#9736403abec9ccb6cee3e6fca3a8d49b6c1d8b61"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -3221,6 +3261,7 @@ dependencies = [
  "dashmap",
  "futures",
  "hex",
+ "key-utils",
  "libp2p",
  "rand 0.8.5",
  "rocksdb",
@@ -3302,7 +3343,7 @@ dependencies = [
 [[package]]
 name = "parsers_sv2"
 version = "0.2.2"
-source = "git+https://github.com/average-gary/stratum?branch=feature-flag-subprotocols#f62dd1dc9ab2912c4fa9932a9a47affb97b4933f"
+source = "git+https://github.com/average-gary/stratum?branch=feature-flag-subprotocols#4d35e317ab3388fa92024615a51f9415581717c9"
 dependencies = [
  "binary_sv2",
  "common_messages_sv2",
@@ -3380,7 +3421,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "edd1101f170f5903fde0914f899bb503d9ff5271d7ba76bbb70bea63690cc0d5"
 dependencies = [
  "pest",
- "sha2",
+ "sha2 0.10.9",
 ]
 
 [[package]]
@@ -4333,13 +4374,26 @@ dependencies = [
 
 [[package]]
 name = "sha2"
+version = "0.9.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4d58a1e1bf39749807d89cf2d98ac2dfa0ff1cb3faa38fbb64dd88ac8013d800"
+dependencies = [
+ "block-buffer 0.9.0",
+ "cfg-if",
+ "cpufeatures",
+ "digest 0.9.0",
+ "opaque-debug",
+]
+
+[[package]]
+name = "sha2"
 version = "0.10.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7507d819769d01a365ab707794a4084392c824f54a7a6a7862f8c3d0892b283"
 dependencies = [
  "cfg-if",
  "cpufeatures",
- "digest",
+ "digest 0.10.7",
 ]
 
 [[package]]
@@ -4372,7 +4426,7 @@ version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77549399552de45a898a580c1b41d445bf730df867cc44e6c0233bbc4b8329de"
 dependencies = [
- "digest",
+ "digest 0.10.7",
  "rand_core 0.6.4",
 ]
 
@@ -4407,7 +4461,7 @@ dependencies = [
  "rand_core 0.6.4",
  "ring 0.17.14",
  "rustc_version",
- "sha2",
+ "sha2 0.10.9",
  "subtle",
 ]
 
@@ -4462,7 +4516,7 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 [[package]]
 name = "stratum-core"
 version = "0.2.1"
-source = "git+https://github.com/average-gary/stratum?branch=feature-flag-subprotocols#f62dd1dc9ab2912c4fa9932a9a47affb97b4933f"
+source = "git+https://github.com/average-gary/stratum?branch=feature-flag-subprotocols#4d35e317ab3388fa92024615a51f9415581717c9"
 dependencies = [
  "binary_sv2",
  "bitcoin",
@@ -4594,7 +4648,7 @@ dependencies = [
 [[package]]
 name = "template_distribution_sv2"
 version = "5.0.0"
-source = "git+https://github.com/average-gary/stratum?branch=feature-flag-subprotocols#f62dd1dc9ab2912c4fa9932a9a47affb97b4933f"
+source = "git+https://github.com/average-gary/stratum?branch=feature-flag-subprotocols#4d35e317ab3388fa92024615a51f9415581717c9"
 dependencies = [
  "binary_sv2",
 ]

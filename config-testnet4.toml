@@ -1,0 +1,43 @@
+[store]
+path = "./store-testnet4.db"
+background_task_frequency_hours = 24
+pplns_ttl_days = 1
+
+[stratum]
+hostname = "0.0.0.0"
+port = 3333
+start_difficulty = 1
+minimum_difficulty = 1
+bootstrap_address = "tb1qs5kpecpax8uv4vn5uqfyycmmmma7jhunmce0z4"
+donation_address = "tb1qs5kpecpax8uv4vn5uqfyycmmmma7jhunmce0z4"
+donation = 10000
+ignore_difficulty = true
+zmqpubhashblock = "tcp://127.0.0.1:28334"
+network = "testnet4"
+version_mask = "1fffe000"
+difficulty_multiplier = 1.0
+pool_signature = "hydrapool-sv2"
+
+[stratum_sv2]
+enabled = true
+hostname = "0.0.0.0"
+port = 3334
+authority_public_key = "9auqWEzQDVyd2oe1JVGFLMLHZtCo2FFqZwtKA5gd9xbuEu7PH72"
+authority_secret_key = "mkDLTBBRxdBv998612qipDYoTK3YUrqLe8uWw7gu3iXbSrn2n"
+cert_validity_seconds = 86400
+server_id = 0
+
+[bitcoinrpc]
+url = "http://127.0.0.1:48335"
+username = "myusername"
+password = "mypassword"
+
+[logging]
+level = "info"
+stats_dir = "./logs/stats-testnet4"
+
+[api]
+hostname = "0.0.0.0"
+port = 46884
+auth_user = "hydrapool"
+auth_token = "0d74058f74ad3b6768493cedb5e9492b$2a2599d5f4003c291e141762d0e43808cfd932f04a8260e94c375d1574599dbf"
