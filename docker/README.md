@@ -47,7 +47,7 @@ docker compose ps
 ### 5. Access services
 
 - **Stratum V1 mining:** `stratum+tcp://localhost:3333`
-- **Stratum V2 mining:** `noise+tcp://localhost:3334` (encrypted, requires SV2-compatible miner; enable in config first)
+- **Stratum V2 mining:** `stratum2+tcp://localhost:3334` (Noise NX encrypted, requires SV2-compatible miner or translator proxy; enable in config first)
 - **API server:** `http://localhost:46884`
 - **Grafana dashboard:** `http://localhost:3000` (if running with dashboards, login with credentials from step 2)
 - **Prometheus:** `http://localhost:9090` (if running with dashboards)
