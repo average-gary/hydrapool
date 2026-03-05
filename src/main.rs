@@ -20,9 +20,10 @@ use p2poolv2_lib::accounting::stats::metrics;
 use p2poolv2_lib::config::Config;
 use p2poolv2_lib::logging::setup_logging;
 use p2poolv2_lib::node::actor::NodeHandle;
-use p2poolv2_lib::shares::chain::chain_store::ChainStore;
+use p2poolv2_lib::shares::chain::chain_store_handle::ChainStoreHandle;
 use p2poolv2_lib::shares::share_block::ShareBlock;
 use p2poolv2_lib::store::Store;
+use p2poolv2_lib::store::writer::{StoreHandle, StoreWriter, write_channel};
 use p2poolv2_lib::stratum::client_connections::start_connections_handler;
 use p2poolv2_lib::stratum::emission::Emission;
 use p2poolv2_lib::stratum::server::StratumServerBuilder;
@@ -30,6 +31,11 @@ use p2poolv2_lib::stratum::work::gbt::start_gbt;
 use p2poolv2_lib::stratum::work::notify::start_notify;
 use p2poolv2_lib::stratum::work::tracker::start_tracker_actor;
 use p2poolv2_lib::stratum::zmq_listener::{ZmqListener, ZmqListenerTrait};
+use p2poolv2_lib::stratum_sv2::channels::start_channel_manager;
+use p2poolv2_lib::stratum_sv2::connection::{AuthorityKeypair, Sv2ServerConfig, run_accept_loop};
+use p2poolv2_lib::stratum_sv2::connections::start_sv2_connections_handler;
+use p2poolv2_lib::stratum_sv2::handler::{Sv2ConnectionContext, handle_sv2_connection};
+use p2poolv2_lib::stratum_sv2::job_distributor::start_job_distributor;
 use std::process::exit;
 use std::sync::Arc;
 use std::time::Duration;
@@ -122,14 +128,26 @@ async fn main() -> Result<(), String> {
 
     let genesis = ShareBlock::build_genesis_for_network(config.stratum.network);
     let store = Arc::new(Store::new(config.store.path.clone(), false).unwrap());
-    let chain_store = Arc::new(ChainStore::new(
-        store.clone(),
-        genesis,
-        config.stratum.network,
-    ));
 
-    let tip = chain_store.store.get_chain_tip();
-    let height = chain_store.get_tip_height();
+    // Create StoreWriter for serialized database writes (runs on dedicated blocking thread)
+    let (write_tx, write_rx) = write_channel();
+    let store_writer = StoreWriter::new(store.clone(), write_rx);
+    tokio::task::spawn_blocking(move || store_writer.run());
+
+    // Create StoreHandle and ChainStoreHandle
+    let store_handle = StoreHandle::new(store.clone(), write_tx);
+    let chain_store_handle = ChainStoreHandle::new(store_handle, config.stratum.network);
+
+    if let Err(e) = chain_store_handle
+        .init_or_setup_genesis(genesis.clone())
+        .await
+    {
+        error!("Failed to initialize chain: {e}");
+        return Err(format!("Failed to initialize chain: {e}"));
+    }
+
+    let tip = chain_store_handle.store_handle().get_chain_tip();
+    let height = chain_store_handle.get_tip_height();
     info!("Latest tip {:?} at height {:?}", tip, height);
 
     let background_tasks_store = store.clone();
@@ -176,25 +194,135 @@ async fn main() -> Result<(), String> {
     let connections_cloned = connections_handle.clone();
 
     let tracker_handle_cloned = tracker_handle.clone();
-    let store_for_notify = chain_store.clone();
+    let chain_store_handle_for_notify = chain_store_handle.clone();
+    let miner_pubkey = config
+        .miner
+        .as_ref()
+        .map(|miner_config| miner_config.pubkey);
 
-    let cloned_stratum_config = stratum_config.clone();
-    tokio::spawn(async move {
-        info!("Starting Stratum notifier...");
-        // This will run indefinitely, sending new block templates to the Stratum server as they arrive
-        start_notify(
-            notify_rx,
-            connections_cloned,
-            store_for_notify,
-            tracker_handle_cloned,
-            &cloned_stratum_config,
-            None,
-        )
-        .await;
-    });
+    // SV2 job distributor handle will be passed to start_notify() so that new
+    // templates are forwarded to SV2 miners via the same GBT pipeline.
+    // We set this to Some(...) below if SV2 is enabled, otherwise it stays None.
+    let mut sv2_job_distributor_for_notify: Option<
+        p2poolv2_lib::stratum_sv2::job_distributor::Sv2JobDistributorHandle,
+    > = None;
+    // Placeholder — will be set in the SV2 startup block below, used
+    // when spawning the notify task after the SV2 section.
+    let _ = &sv2_job_distributor_for_notify;
 
     let (emissions_tx, emissions_rx) =
         tokio::sync::mpsc::channel::<Emission>(STRATUM_SHARES_BUFFER_SIZE);
+
+    // --- SV2 Server Startup ---
+    // Clone emissions_tx before SV1 takes ownership, so SV2 shares feed
+    // into the same accounting pipeline.
+    let mut _sv2_shutdown_tx: Option<oneshot::Sender<()>> = None;
+    if let Some(ref sv2_config) = config.stratum_sv2 {
+        if sv2_config.enabled {
+            if let Err(e) = sv2_config.validate() {
+                error!("Invalid SV2 config: {e}");
+                return Err(format!("Invalid SV2 config: {e}"));
+            }
+
+            let sv2_emissions_tx = emissions_tx.clone();
+            let (shutdown_tx, shutdown_rx) = oneshot::channel();
+            _sv2_shutdown_tx = Some(shutdown_tx);
+
+            // Resolve authority keypair
+            let authority = match (
+                &sv2_config.authority_public_key,
+                &sv2_config.authority_secret_key,
+            ) {
+                (Some(pk), Some(sk)) => {
+                    AuthorityKeypair::from_config(pk, sk, sv2_config.cert_validity_seconds)
+                        .map_err(|e| format!("SV2 keypair error: {e}"))?
+                }
+                _ => {
+                    error!("SV2 enabled but authority_public_key/authority_secret_key not set");
+                    return Err(
+                        "SV2 requires authority_public_key and authority_secret_key in config"
+                            .to_string(),
+                    );
+                }
+            };
+
+            let sv2_server_config = Sv2ServerConfig {
+                hostname: sv2_config.hostname.clone(),
+                port: sv2_config.port,
+                authority,
+            };
+
+            // Start SV2 actors
+            let sv2_connections = start_sv2_connections_handler().await;
+            let sv2_job_dist = start_job_distributor(sv2_config.server_id);
+
+            // Default target: difficulty 1 (all 0xff except first 4 bytes)
+            let mut default_target = [0xff; 32];
+            default_target[0..4].copy_from_slice(&[0x00, 0x00, 0xff, 0xff]);
+            let sv2_channels = start_channel_manager(sv2_config.server_id, default_target);
+
+            // Determine validate_addresses from donation config
+            let sv2_validate_addresses =
+                stratum_config.donation.unwrap_or_default() != FULL_DONATION_BIPS;
+
+            // Wire the SV2 job distributor into the notify pipeline so
+            // new block templates are forwarded to SV2 miners.
+            sv2_job_distributor_for_notify = Some(sv2_job_dist.clone());
+
+            // Build the shared context for per-connection handlers
+            let sv2_ctx = Sv2ConnectionContext {
+                connections: sv2_connections,
+                channels: sv2_channels,
+                job_distributor: sv2_job_dist,
+                emissions_tx: sv2_emissions_tx,
+                chain_store: chain_store_handle.clone(),
+                validate_addresses: sv2_validate_addresses,
+                network: stratum_config.network,
+            };
+
+            // Start the TCP accept loop for SV2
+            let (handshake_tx, mut handshake_rx) = tokio::sync::mpsc::channel(64);
+            tokio::spawn(async move {
+                if let Err(e) = run_accept_loop(sv2_server_config, handshake_tx, shutdown_rx).await
+                {
+                    error!("SV2 accept loop error: {e}");
+                }
+            });
+
+            // Spawn per-connection handlers as handshakes complete
+            let sv2_ctx_for_loop = sv2_ctx.clone();
+            tokio::spawn(async move {
+                while let Some(handshake) = handshake_rx.recv().await {
+                    let ctx = sv2_ctx_for_loop.clone();
+                    tokio::spawn(async move {
+                        handle_sv2_connection(handshake, ctx).await;
+                    });
+                }
+            });
+
+            info!(
+                "SV2 server listening on {}:{} (Noise NX encrypted)",
+                sv2_config.hostname, sv2_config.port
+            );
+        }
+    }
+
+    // Start the notify task AFTER the SV2 block so sv2_job_distributor_for_notify
+    // is set when SV2 is enabled.
+    let cloned_stratum_config = stratum_config.clone();
+    tokio::spawn(async move {
+        info!("Starting Stratum notifier...");
+        start_notify(
+            notify_rx,
+            connections_cloned,
+            chain_store_handle_for_notify,
+            tracker_handle_cloned,
+            &cloned_stratum_config,
+            miner_pubkey,
+            sv2_job_distributor_for_notify,
+        )
+        .await;
+    });
 
     let metrics_handle = match metrics::start_metrics(config.logging.stats_dir.clone()).await {
         Ok(handle) => handle,
@@ -205,7 +333,7 @@ async fn main() -> Result<(), String> {
     let metrics_cloned = metrics_handle.clone();
     let metrics_for_shutdown = metrics_handle.clone();
     let stats_dir_for_shutdown = config.logging.stats_dir.clone();
-    let store_for_stratum = chain_store.clone();
+    let chain_store_handle_for_stratum = chain_store_handle.clone();
     let tracker_handle_cloned = tracker_handle.clone();
 
     tokio::spawn(async move {
@@ -224,7 +352,7 @@ async fn main() -> Result<(), String> {
             )) // 100% donation in bips, skip address validation
             .network(stratum_config.network)
             .version_mask(stratum_config.version_mask)
-            .store(store_for_stratum)
+            .chain_store_handle(chain_store_handle_for_stratum)
             .build()
             .await
             .unwrap();
@@ -246,7 +374,7 @@ async fn main() -> Result<(), String> {
 
     let api_shutdown_tx = match start_api_server(
         config.api.clone(),
-        chain_store.clone(),
+        chain_store_handle.clone(),
         metrics_handle.clone(),
         tracker_handle,
         stratum_config.network,
@@ -265,7 +393,7 @@ async fn main() -> Result<(), String> {
         config.api.hostname, config.api.port
     );
 
-    match NodeHandle::new(config, chain_store, emissions_rx, metrics_handle).await {
+    match NodeHandle::new(config, chain_store_handle, emissions_rx, metrics_handle).await {
         Ok((node_handle, stopping_rx)) => {
             info!("Node started");
 
@@ -292,6 +420,11 @@ async fn main() -> Result<(), String> {
             stratum_shutdown_tx
                 .send(())
                 .expect("Failed to send shutdown signal to Stratum server");
+
+            if let Some(sv2_tx) = _sv2_shutdown_tx.take() {
+                let _ = sv2_tx.send(());
+                info!("SV2 server stopped");
+            }
 
             api_shutdown_tx
                 .send(())

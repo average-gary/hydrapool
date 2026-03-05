@@ -1,0 +1,88 @@
+# Docker Compose for SV2 interoperability testing.
+#
+# Services:
+#   bitcoind      - Bitcoin Core in regtest mode (generates blocks)
+#   hydrapool     - Hydrapool with SV2 enabled (built from local source)
+#   mining-device - SRI CPU miner connecting to Hydrapool via SV2
+#
+# Usage:
+#   scripts/test-interop-sv2.sh          # automated test (recommended)
+#   docker compose -f docker/docker-compose.interop.yml up --build  # manual
+
+services:
+  bitcoind:
+    image: lncm/bitcoind:v28.0
+    container_name: interop-bitcoind
+    command:
+      - -conf=/bitcoin/.bitcoin/bitcoin.conf
+      - -regtest
+    volumes:
+      - ./interop/bitcoin-regtest.conf:/bitcoin/.bitcoin/bitcoin.conf:ro
+      - bitcoind_data:/bitcoin/.bitcoin
+    ports:
+      - "18443:18443"
+      - "28332:28332"
+    networks:
+      - interop_network
+    healthcheck:
+      test: ["CMD", "bitcoin-cli", "-regtest", "-rpcuser=hydrapool", "-rpcpassword=hydrapool", "getblockchaininfo"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+  hydrapool:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.hydrapool
+    container_name: interop-hydrapool
+    depends_on:
+      bitcoind:
+        condition: service_healthy
+    volumes:
+      - ./interop/config-regtest.toml:/etc/hydrapool/config.toml:ro
+      - hydrapool_data:/var/lib/hydrapool
+      - hydrapool_logs:/var/log/hydrapool
+    ports:
+      - "3333:3333"
+      - "3334:3334"
+      - "46884:46884"
+    networks:
+      - interop_network
+    environment:
+      - RUST_LOG=debug
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:46884/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  mining-device:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.mining-device
+    container_name: interop-mining-device
+    depends_on:
+      hydrapool:
+        condition: service_healthy
+    command:
+      - --address-pool
+      - hydrapool:3334
+      - --id-user
+      - "tb1qyazxde6558qj6z3d9np5e6msmrspwpf6k0qggk.interop-rig1"
+      - --nominal-hashrate-multiplier
+      - "0.01"
+    networks:
+      - interop_network
+    environment:
+      - RUST_LOG=debug
+
+volumes:
+  bitcoind_data:
+  hydrapool_data:
+  hydrapool_logs:
+
+networks:
+  interop_network:
+    driver: bridge

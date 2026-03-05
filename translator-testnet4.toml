@@ -1,0 +1,36 @@
+# SRI Translator Proxy Config — connects SV1 miners to hydrapool SV2
+#
+# Upstream: hydrapool SV2 on 127.0.0.1:3334
+# Downstream: SV1 miners connect to 0.0.0.0:34255
+
+downstream_address = "0.0.0.0"
+downstream_port = 34255
+
+max_supported_version = 2
+min_supported_version = 2
+
+# Extranonce2 size for downstream SV1 miners (4 bytes is standard)
+downstream_extranonce2_size = 4
+
+# User identity sent to hydrapool — must be a valid testnet4 address
+# since hydrapool validates usernames as Bitcoin addresses
+user_identity = "tb1qs5kpecpax8uv4vn5uqfyycmmmma7jhunmce0z4"
+
+# Each miner gets its own upstream channel (not aggregated)
+aggregate_channels = false
+
+supported_extensions = []
+required_extensions = []
+
+# Very low hashrate floor for CPU mining on testnet4
+[downstream_difficulty_config]
+min_individual_miner_hashrate = 1000.0
+shares_per_minute = 6.0
+enable_vardiff = true
+job_keepalive_interval_secs = 60
+
+# Connect to hydrapool SV2
+[[upstreams]]
+address = "127.0.0.1"
+port = 3334
+authority_pubkey = "9auqWEzQDVyd2oe1JVGFLMLHZtCo2FFqZwtKA5gd9xbuEu7PH72"

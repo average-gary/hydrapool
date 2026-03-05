@@ -47,6 +47,24 @@ difficulty_multiplier = 1.0
 # Comment out for anonymous mining or replace/append your identifier.
 pool_signature = "hydrapool"
 
+# Stratum V2 Mining Protocol (optional, disabled by default)
+# Runs alongside the SV1 server on a separate port. Both protocols
+# feed validated shares into the same PPLNS accounting pipeline.
+# [stratum_sv2]
+# enabled = true
+# hostname = "0.0.0.0"
+# port = 3334
+# Noise NX keypair for encrypted connections. REQUIRED when SV2 is
+# enabled — the server will refuse to start without both keys.
+# Generate a keypair with:
+#   openssl rand -hex 32   # -> authority_secret_key
+# Then derive the x-only public key from the secret key using secp256k1.
+# authority_public_key = "<64 hex chars (32-byte x-only pubkey)>"
+# authority_secret_key = "<64 hex chars (32-byte secret key)>"
+# cert_validity_seconds = 86400
+# default_extranonce_size = 16
+# server_id = 0
+
 [bitcoinrpc]
 # REQUIRED: Bitcoin RPC connection
 # For Docker: use "http://host.docker.internal:38332" to connect to host

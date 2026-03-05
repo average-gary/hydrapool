@@ -1,0 +1,39 @@
+# Build the SRI mining-device (CPU SV2 miner) from source.
+# Used for interoperability testing against Hydrapool's SV2 server.
+#
+# Build: docker build -f docker/Dockerfile.mining-device -t mining-device .
+# (No local context needed; this clones from GitHub.)
+
+FROM rust:1.85-slim-bookworm AS builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+# Clone the sv2-apps repo (pinned to main for reproducibility).
+ARG SV2_APPS_REF=main
+RUN git clone --depth 1 --branch ${SV2_APPS_REF} \
+    https://github.com/stratum-mining/sv2-apps.git .
+
+# Build the mining-device binary.
+WORKDIR /build/miner-apps/mining-device
+RUN cargo build --release
+
+# --- Runtime stage ---
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libssl3 \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /build/miner-apps/mining-device/target/release/mining_device \
+     /usr/local/bin/mining_device
+
+RUN chmod +x /usr/local/bin/mining_device
+
+ENTRYPOINT ["/usr/local/bin/mining_device"]

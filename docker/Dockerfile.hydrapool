@@ -68,7 +68,9 @@ USER hydrapool
 # Set working directory
 WORKDIR /var/lib/hydrapool
 
-# Expose API port (adjust based on your config)
+# Expose service ports
+EXPOSE 3333  
+EXPOSE 3334  
 EXPOSE 46884
 
 # Set environment
